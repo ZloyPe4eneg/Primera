@@ -266,6 +266,8 @@
 	///how many rockets can we send with ivanov strike
 	var/rockets_left = 0
 	var/aiming_missile = FALSE
+	var/strike_pod_type
+	var/list/strike_explosion_size = list(0, 0, 1, 2)
 
 /datum/action/vehicle/sealed/mecha/ivanov_strike/Destroy()
 	if(aiming_missile)
@@ -308,7 +310,7 @@
 	rockets_left = 3
 	RegisterSignal(chassis, COMSIG_MECHA_MELEE_CLICK, PROC_REF(on_melee_click))
 	RegisterSignal(chassis, COMSIG_MECHA_EQUIPMENT_CLICK, PROC_REF(on_equipment_click))
-	owner.client.mouse_override_icon = 'icons/effects/mouse_pointers/supplypod_down_target.dmi'
+	owner.client?.mouse_override_icon = 'icons/effects/mouse_pointers/supplypod_down_target.dmi'
 	owner.update_mouse_pointer()
 	owner.overlay_fullscreen("ivanov", /atom/movable/screen/fullscreen/ivanov_display, 1)
 	SEND_SOUND(owner, 'sound/machines/terminal/terminal_on.ogg') //spammable so I don't want to make it audible to anyone else
@@ -323,9 +325,9 @@
 	aiming_missile = FALSE
 	rockets_left = 0
 	UnregisterSignal(chassis, list(COMSIG_MECHA_MELEE_CLICK, COMSIG_MECHA_EQUIPMENT_CLICK))
-	owner.client.mouse_override_icon = null
-	owner.update_mouse_pointer()
-	owner.clear_fullscreen("ivanov")
+	owner?.client?.mouse_override_icon = null
+	owner?.update_mouse_pointer()
+	owner?.clear_fullscreen("ivanov")
 
 ///signal called from clicking with no equipment
 /datum/action/vehicle/sealed/mecha/ivanov_strike/proc/on_melee_click(datum/source, mob/living/pilot, atom/target, on_cooldown, is_adjacent)
@@ -357,9 +359,10 @@
 	S_TIMER_COOLDOWN_START(chassis, COOLDOWN_MECHA_MISSILE_STRIKE, strike_cooldown_time)
 	podspawn(list(
 		"target" = target_turf,
+		"path" = strike_pod_type,
 		"style" = /datum/pod_style/missile,
 		"effectMissile" = TRUE,
-		"explosionSize" = list(0,0,1,2)
+		"explosionSize" = strike_explosion_size,
 	))
 	button_icon_state = "mech_ivanov_cooldown"
 	build_all_button_icons()

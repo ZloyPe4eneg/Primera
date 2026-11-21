@@ -49,6 +49,7 @@
 	var/equipment_disabled = FALSE
 	/// Keeps track of the mech's cell
 	var/obj/item/stock_parts/power_store/cell
+	var/removable_cell = TRUE
 	/// Keeps track of the mech's scanning module
 	var/obj/item/stock_parts/scanning_module/scanmod
 	/// Keeps track of the mech's capacitor
@@ -604,7 +605,8 @@
 		spark_system.start()
 		var/damage_energy_consumption = 0.005 * STANDARD_CELL_CHARGE * seconds_per_tick
 		use_energy(damage_energy_consumption)
-		cell.maxcharge -= min(damage_energy_consumption, cell.maxcharge)
+		if(!istype(cell, /obj/item/stock_parts/power_store/cell/infinite))
+			cell.maxcharge -= min(damage_energy_consumption, cell.maxcharge)
 
 /obj/vehicle/sealed/mecha/proc/process_cabin_air(seconds_per_tick)
 	if(!(internal_damage & MECHA_INT_TEMP_CONTROL) && cabin_air && cabin_air.return_volume() > 0)
@@ -695,36 +697,27 @@
 	if(internal_damage & MECHA_INT_CONTROL_LOST)
 		target = pick(view(3,target))
 	var/mob/living/livinguser = user
-	if(!(livinguser in return_controllers_with_flag(VEHICLE_CONTROL_EQUIPMENT)))
+	var/control_flags = LAZYACCESS(occupants, livinguser)
+	if(!(control_flags & (VEHICLE_CONTROL_EQUIPMENT | VEHICLE_CONTROL_MELEE)))
 		balloon_alert(user, "wrong seat for equipment!")
 		return
 	var/obj/item/mecha_parts/mecha_equipment/selected
-	if(modifiers[BUTTON] == RIGHT_CLICK)
-		selected = equip_by_category[MECHA_R_ARM]
-	else
-		selected = equip_by_category[MECHA_L_ARM]
-	if(selected)
-		if(!Adjacent(target) && (selected.range & MECHA_RANGED))
-			if(HAS_TRAIT(livinguser, TRAIT_PACIFISM) && selected.harmful)
-				to_chat(livinguser, span_warning("You don't want to harm other living beings!"))
-				return
-			if(SEND_SIGNAL(src, COMSIG_MECHA_EQUIPMENT_CLICK, livinguser, target) & COMPONENT_CANCEL_EQUIPMENT_CLICK)
-				return
-			INVOKE_ASYNC(selected, TYPE_PROC_REF(/obj/item/mecha_parts/mecha_equipment, action), user, target, modifiers)
+	if(control_flags & VEHICLE_CONTROL_EQUIPMENT)
+		selected = equip_by_category[modifiers[BUTTON] == RIGHT_CLICK ? MECHA_R_ARM : MECHA_L_ARM]
+	var/adjacent = Adjacent(target)
+	var/attack_range = adjacent ? MECHA_MELEE : MECHA_RANGED
+	if(selected && (selected.range & attack_range))
+		if(selected.harmful && (!adjacent || isliving(target)) && HAS_TRAIT(livinguser, TRAIT_PACIFISM))
+			to_chat(livinguser, span_warning("You don't want to harm other living beings!"))
 			return
-		if(Adjacent(target) && (selected.range & MECHA_MELEE))
-			if(isliving(target) && selected.harmful && HAS_TRAIT(livinguser, TRAIT_PACIFISM))
-				to_chat(livinguser, span_warning("You don't want to harm other living beings!"))
-				return
-			if(SEND_SIGNAL(src, COMSIG_MECHA_EQUIPMENT_CLICK, livinguser, target) & COMPONENT_CANCEL_EQUIPMENT_CLICK)
-				return
-			INVOKE_ASYNC(selected, TYPE_PROC_REF(/obj/item/mecha_parts/mecha_equipment, action), user, target, modifiers)
+		if(SEND_SIGNAL(src, COMSIG_MECHA_EQUIPMENT_CLICK, livinguser, target) & COMPONENT_CANCEL_EQUIPMENT_CLICK)
 			return
-	if(!(livinguser in return_controllers_with_flag(VEHICLE_CONTROL_MELEE)))
+		INVOKE_ASYNC(selected, TYPE_PROC_REF(/obj/item/mecha_parts/mecha_equipment, action), user, target, modifiers)
+		return
+	if(!(control_flags & VEHICLE_CONTROL_MELEE))
 		to_chat(livinguser, span_warning("You're in the wrong seat to interact with your hands."))
 		return
 	var/on_cooldown = TIMER_COOLDOWN_RUNNING(src, COOLDOWN_MECHA_MELEE_ATTACK)
-	var/adjacent = Adjacent(target)
 	if(SEND_SIGNAL(src, COMSIG_MECHA_MELEE_CLICK, livinguser, target, on_cooldown, adjacent) & COMPONENT_CANCEL_MELEE_CLICK)
 		return
 	if(on_cooldown || !adjacent)
