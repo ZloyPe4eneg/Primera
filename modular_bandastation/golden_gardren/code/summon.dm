@@ -1,22 +1,8 @@
-/// Time between two summons.
 #define GOLDEN_GARDREN_SUMMON_COOLDOWN (1 MINUTES)
-/// How long the mech climbs into the sky before it is sent down.
 #define GOLDEN_GARDREN_SUMMON_TAKEOFF (1.5 SECONDS)
-/// How far from the summoner the mech may land, in tiles.
 #define GOLDEN_GARDREN_SUMMON_RANGE 2
-/// Drop timings in deciseconds: two seconds of warning over the landing spot, then the fall.
 #define GOLDEN_GARDREN_SUMMON_DELAYS list(POD_TRANSIT = 20, POD_FALLING = 8, POD_OPENING = 1, POD_LEAVING = 1)
 
-/// Returns TRUE for any mech of the Golden-Gardren family.
-/proc/is_golden_gardren_mech(atom/thing)
-	return istype(thing, /obj/vehicle/sealed/mecha/golden) || istype(thing, /obj/vehicle/sealed/mecha/gardren) || istype(thing, /obj/vehicle/sealed/mecha/golden_gardren)
-
-/**
- * ## Golden-Gardren summon implant
- *
- * Admin-only: not in any vendor, uplink, research node, map or loot table, only spawned by admins.
- * Activated inside a mech of the pair it binds to that mech; activated outside it calls the bound mech down next to the implantee.
- */
 /obj/item/implant/golden_gardren_summon
 	name = "\improper Golden-Gardren summon implant"
 	desc = "Маячок вызова, связанный с одним мехом пары Голден-Гардрен."
@@ -28,16 +14,20 @@
 		Не стойте на отмеченной клетке посадки. Мех должен быть пустым. Перезарядка — минута."
 	implant_lore = "Экспериментальный маячок ЦК для ивентовых машин. Подаёт сигнал автопилоту меха, \
 		который поднимает машину на реактивной тяге и сбрасывает её по координатам носителя."
-	/// The mech this implant calls.
 	var/datum/weakref/linked_mech
+	var/obj/vehicle/sealed/mecha/launching_mech
 	COOLDOWN_DECLARE(summon_cooldown)
+
+/obj/item/implant/golden_gardren_summon/Destroy(force)
+	finish_takeoff()
+	return ..()
 
 /obj/item/implant/golden_gardren_summon/on_activate()
 	. = ..()
 	var/mob/living/user = imp_in
 	if(!user)
 		return
-	if(is_golden_gardren_mech(user.loc))
+	if(istype(user.loc, /obj/vehicle/sealed/mecha/golden_gardren_base))
 		linked_mech = WEAKREF(user.loc)
 		balloon_alert(user, "мех привязан")
 		return
@@ -52,20 +42,19 @@
 		balloon_alert(user, blocker)
 		return
 	COOLDOWN_START(src, summon_cooldown, GOLDEN_GARDREN_SUMMON_COOLDOWN)
+	launching_mech = mech
 	GLOB.golden_gardren_busy += mech
 	user.log_message("summoned [mech] from [AREACOORD(mech)] with a summon implant.", LOG_GAME)
 	to_chat(user, span_notice("Сигнал принят: [mech.declent_ru(NOMINATIVE)] вылетает к вам!"))
 	take_off(mech)
-	addtimer(CALLBACK(src, PROC_REF(launch), mech, user), GOLDEN_GARDREN_SUMMON_TAKEOFF)
+	addtimer(CALLBACK(src, PROC_REF(launch), user), GOLDEN_GARDREN_SUMMON_TAKEOFF)
 
-/// The bound mech; a docked half answers through the combined frame it sits in.
 /obj/item/implant/golden_gardren_summon/proc/get_linked_mech()
 	var/obj/vehicle/sealed/mecha/mech = linked_mech?.resolve()
 	if(istype(mech?.loc, /obj/vehicle/sealed/mecha/golden_gardren))
 		mech = mech.loc
 	return mech
 
-/// Returns why [mech] cannot come down at [landing] for [user] right now, or null if it can.
 /obj/item/implant/golden_gardren_summon/proc/summon_blocker(obj/vehicle/sealed/mecha/mech, mob/living/user, turf/landing, check_cooldown)
 	if(QDELETED(mech))
 		return "мех уничтожен"
@@ -83,7 +72,6 @@
 		return "нет места для посадки"
 	return null
 
-/// Picks the closest free, visible floor around [user] the mech can land on.
 /obj/item/implant/golden_gardren_summon/proc/find_landing(mob/living/user)
 	var/turf/center = get_turf(user)
 	if(!center)
@@ -100,10 +88,8 @@
 			return pick(candidates)
 	return null
 
-/// The mech fires its jets and climbs out of sight where it stands.
 /obj/item/implant/golden_gardren_summon/proc/take_off(obj/vehicle/sealed/mecha/mech)
 	var/turf/origin = get_turf(mech)
-	// Nobody held in the fist goes up into the sky with it.
 	golden_gardren_release_fist(mech)
 	mech.visible_message(span_warning("[mech.declent_ru(NOMINATIVE)] с рёвом двигателей взмывает в небо!"))
 	playsound(origin, 'sound/vehicles/rocketlaunch.ogg', 80, TRUE)
@@ -111,14 +97,23 @@
 		new /obj/effect/temp_visual/small_smoke/halfsecond(smoke_turf)
 	animate(mech, pixel_z = mech.base_pixel_z + 10 * ICON_SIZE_Y, alpha = 0, time = GOLDEN_GARDREN_SUMMON_TAKEOFF, easing = QUAD_EASING | EASE_IN)
 
-/// After the climb: send the mech down to the summoner, or put it back if anything changed in the meantime.
-/obj/item/implant/golden_gardren_summon/proc/launch(obj/vehicle/sealed/mecha/mech, mob/living/user)
+/obj/item/implant/golden_gardren_summon/proc/finish_takeoff()
+	var/obj/vehicle/sealed/mecha/mech = launching_mech
+	if(!mech)
+		return null
+	launching_mech = null
 	GLOB.golden_gardren_busy -= mech
 	if(QDELETED(mech))
-		return
+		return null
 	animate(mech)
 	mech.pixel_z = mech.base_pixel_z
 	mech.alpha = initial(mech.alpha)
+	return mech
+
+/obj/item/implant/golden_gardren_summon/proc/launch(mob/living/user)
+	var/obj/vehicle/sealed/mecha/mech = finish_takeoff()
+	if(!mech)
+		return
 	var/summoner_gone = QDELETED(user) || user != imp_in
 	var/turf/landing = summoner_gone ? null : find_landing(user)
 	var/blocker = summoner_gone ? "носитель импланта пропал" : summon_blocker(mech, user, landing, check_cooldown = FALSE)
@@ -129,7 +124,6 @@
 		return
 	drop_mech(mech, landing)
 
-/// Sends [mech] down onto [landing] in an invisible drop pod, so the mech itself is seen falling from the sky.
 /obj/item/implant/golden_gardren_summon/proc/drop_mech(obj/vehicle/sealed/mecha/mech, turf/landing)
 	mech.log_message("Summoned to [AREACOORD(landing)].", LOG_MECHA)
 	podspawn(list(
@@ -142,7 +136,6 @@
 		"delays" = GOLDEN_GARDREN_SUMMON_DELAYS,
 	))
 
-/// The pod deals a light impact to anyone on the exact landing tile.
 /obj/structure/closet/supplypod/podspawn/golden_gardren_summon
 	damage = 10
 	effectQuiet = TRUE

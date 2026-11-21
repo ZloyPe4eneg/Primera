@@ -1,9 +1,6 @@
-/// How long each pilot has to answer their confirmation prompt.
 #define GOLDEN_GARDREN_CONFIRM_TIME (15 SECONDS)
-/// How long the Golden takes to climb onto the Gardren.
 #define GOLDEN_GARDREN_COMBINE_TIME (1.5 SECONDS)
 
-/// Mechs of the family in the middle of combining, separating or answering a summon. Blocks a second such action from starting on them.
 GLOBAL_LIST_EMPTY(golden_gardren_busy)
 
 /datum/action/vehicle/sealed/mecha/golden_gardren_combine
@@ -18,13 +15,11 @@ GLOBAL_LIST_EMPTY(golden_gardren_busy)
 		return
 	if(!chassis || !(owner in chassis.occupants))
 		return
-	// Confirmation waits for both pilots and must not hold up the action button.
 	INVOKE_ASYNC(GLOBAL_PROC, GLOBAL_PROC_REF(golden_gardren_try_combine), chassis, owner)
 
 /proc/golden_gardren_pilot_ready(obj/vehicle/sealed/mecha/mech, mob/living/pilot)
 	return !QDELETED(pilot) && pilot.loc == mech && mech.is_occupant(pilot) && pilot.stat == STABLE && !pilot.incapacitated
 
-/// Revalidate the operation after each pilot's confirmation.
 /proc/golden_gardren_confirm_pair(mob/living/initiator, mob/living/partner, title, datum/callback/recheck)
 	var/list/answers = list("Да", "Нет")
 	if(tgui_alert(initiator, "Подтвердить действие «[title]»?", title, answers, GOLDEN_GARDREN_CONFIRM_TIME) != "Да")
@@ -38,14 +33,12 @@ GLOBAL_LIST_EMPTY(golden_gardren_busy)
 	failure = recheck.Invoke()
 	return failure ? "[title] сорвалось: [failure]." : null
 
-/// Returns the pilot able to take part in combining, or null.
 /proc/golden_gardren_pilot(obj/vehicle/sealed/mecha/mech)
 	for(var/mob/living/occupant as anything in mech.occupants)
 		if(golden_gardren_pilot_ready(mech, occupant))
 			return occupant
 	return null
 
-/// Returns why the pair cannot combine right now, or null if it can.
 /proc/golden_gardren_combine_blocker(obj/vehicle/sealed/mecha/golden/golden, obj/vehicle/sealed/mecha/gardren/gardren)
 	if(QDELETED(golden) || QDELETED(gardren))
 		return "пара не найдена"
@@ -60,16 +53,14 @@ GLOBAL_LIST_EMPTY(golden_gardren_busy)
 			return length(mech.occupants) ? "пилот [mech.name] не в состоянии управлять" : "в [mech.name] нет пилота"
 	return null
 
-/// Returns why a combination that had passed its checks cannot go on after a wait, or null if nothing has changed.
 /proc/golden_gardren_combine_recheck(obj/vehicle/sealed/mecha/golden/golden, obj/vehicle/sealed/mecha/gardren/gardren, mob/living/golden_pilot, mob/living/gardren_pilot)
 	var/blocker = golden_gardren_combine_blocker(golden, gardren)
 	if(blocker)
 		return blocker
-	if(golden_gardren_pilot(golden) != golden_pilot || golden_gardren_pilot(gardren) != gardren_pilot)
+	if(!golden_gardren_pilot_ready(golden, golden_pilot) || !golden_gardren_pilot_ready(gardren, gardren_pilot))
 		return "пилоты сменились"
 	return null
 
-/// Finds the other half next to [source] and starts combining with it on behalf of [initiator], keeping both halves busy meanwhile.
 /proc/golden_gardren_try_combine(obj/vehicle/sealed/mecha/source, mob/living/initiator)
 	if(QDELETED(source) || !golden_gardren_pilot_ready(source, initiator))
 		return
@@ -103,10 +94,6 @@ GLOBAL_LIST_EMPTY(golden_gardren_busy)
 	if(failure)
 		golden_gardren_notify(list(golden_pilot, gardren_pilot), failure)
 
-/**
- * Asks both pilots to confirm, revalidates after every wait and builds the frame.
- * Returns the message for the pilots if the combination fell through, or null if the frame was formed.
- */
 /proc/golden_gardren_combine(obj/vehicle/sealed/mecha/golden/golden, obj/vehicle/sealed/mecha/gardren/gardren, mob/living/golden_pilot, mob/living/gardren_pilot, mob/living/initiator)
 	var/mob/living/partner = initiator == golden_pilot ? gardren_pilot : golden_pilot
 	var/failure = golden_gardren_confirm_pair(initiator, partner, "Объединение", CALLBACK(GLOBAL_PROC, GLOBAL_PROC_REF(golden_gardren_combine_recheck), golden, gardren, golden_pilot, gardren_pilot))
@@ -134,7 +121,6 @@ GLOBAL_LIST_EMPTY(golden_gardren_busy)
 	playsound(combined, 'sound/vehicles/mecha/nominal.ogg', 75, TRUE)
 	return null
 
-/// Tells each still existing pilot that a combination or separation fell through.
 /proc/golden_gardren_notify(list/pilots, message)
 	for(var/mob/living/pilot in pilots)
 		if(!QDELETED(pilot))

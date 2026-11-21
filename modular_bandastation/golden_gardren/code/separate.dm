@@ -1,4 +1,3 @@
-/// Splits the Golden-Gardren back into the Golden and the Gardren after both pilots agree.
 /datum/action/vehicle/sealed/mecha/golden_gardren_separate
 	name = "Разделение"
 	desc = "Разделиться на Голдена и Гардрена. Нужны подтверждение обоих пилотов и свободная клетка рядом."
@@ -11,12 +10,9 @@
 		return
 	if(!istype(chassis, /obj/vehicle/sealed/mecha/golden_gardren) || !(owner in chassis.occupants))
 		return
-	// Confirmation waits for both pilots and must not hold up the action button.
 	INVOKE_ASYNC(GLOBAL_PROC, GLOBAL_PROC_REF(golden_gardren_try_separate), chassis, owner)
 
-/// Returns why the frame cannot separate right now, or null if it can.
-/obj/vehicle/sealed/mecha/golden_gardren/proc/separate_blocker(ignore_busy = FALSE)
-	// An admin-spawned frame or one that lost a half has nothing to give back, and must not hand out free mechs.
+/obj/vehicle/sealed/mecha/golden_gardren/proc/separate_blocker(ignore_busy = FALSE, check_exit = TRUE)
 	if(QDELETED(docked_golden) || QDELETED(docked_gardren))
 		return "этот мех нельзя разделить"
 	if(!isturf(loc))
@@ -30,11 +26,10 @@
 	for(var/mob/living/pilot as anything in occupants)
 		if(!golden_gardren_pilot_ready(src, pilot))
 			return "оба пилота должны быть в состоянии управлять"
-	if(!golden_gardren_find_exit_turf(src))
+	if(check_exit && !golden_gardren_find_exit_turf(src, first_available = TRUE))
 		return "нет места для разделения"
 	return null
 
-/// Keeps the frame busy until both pilots have answered and revalidates the separation.
 /proc/golden_gardren_try_separate(obj/vehicle/sealed/mecha/golden_gardren/combined, mob/living/initiator)
 	if(QDELETED(combined) || !golden_gardren_pilot_ready(combined, initiator))
 		return
@@ -61,12 +56,8 @@
 		return "пилоты сменились или утратили возможность управлять"
 	return combined.separate_blocker(ignore_busy = TRUE)
 
-/**
- * Gives the halves back: the Gardren stays on the frame's turf with the main seat pilot, the Golden lands next to it with the gunner.
- * Damage is spread by the share of integrity the frame has left. Deletes the frame. Returns FALSE if there is no room for the Golden.
- */
 /obj/vehicle/sealed/mecha/golden_gardren/proc/disassemble()
-	if(separate_blocker())
+	if(separate_blocker(check_exit = FALSE))
 		return FALSE
 	var/turf/frame_turf = get_turf(src)
 	var/turf/golden_turf = golden_gardren_find_exit_turf(src)
@@ -74,8 +65,8 @@
 		return FALSE
 	var/obj/vehicle/sealed/mecha/golden/golden = docked_golden
 	var/obj/vehicle/sealed/mecha/gardren/gardren = docked_gardren
-	var/list/mob/living/main_pilots = return_drivers()
-	var/list/mob/living/gunners = return_controllers_with_flag(VEHICLE_CONTROL_EQUIPMENT)
+	var/mob/living/main_pilot = find_seat_occupant(VEHICLE_CONTROL_DRIVE)
+	var/mob/living/gunner = find_seat_occupant(VEHICLE_CONTROL_EQUIPMENT)
 	var/integrity_share = get_integrity() / max_integrity
 
 	undock_component(gardren, frame_turf)
@@ -84,17 +75,15 @@
 	gardren.update_integrity(max(1, round(gardren.max_integrity * integrity_share)))
 	golden.update_integrity(max(1, round(golden.max_integrity * integrity_share)))
 
-	if(length(main_pilots))
-		transfer_pilot(gardren, main_pilots[1])
-	if(length(gunners))
-		transfer_pilot(golden, gunners[1])
-	// Anyone else left inside walks out on their own.
+	if(main_pilot)
+		transfer_pilot(gardren, main_pilot)
+	if(gunner)
+		transfer_pilot(golden, gunner)
 	for(var/mob/living/leftover as anything in occupants?.Copy())
 		mob_exit(leftover, silent = TRUE)
 
 	gardren.setDir(dir)
 	golden.setDir(dir)
-	// The Golden jumps down from the Gardren's shoulders.
 	golden.pixel_x = golden.base_pixel_x + (frame_turf.x - golden_turf.x) * ICON_SIZE_X
 	golden.pixel_y = golden.base_pixel_y + (frame_turf.y - golden_turf.y) * ICON_SIZE_Y + 16
 	animate(golden, pixel_x = golden.base_pixel_x, pixel_y = golden.base_pixel_y, time = 0.5 SECONDS, easing = QUAD_EASING | EASE_IN)
@@ -104,7 +93,6 @@
 	qdel(src)
 	return TRUE
 
-/// Takes a half out of the frame and switches it back on.
 /obj/vehicle/sealed/mecha/golden_gardren/proc/undock_component(obj/vehicle/sealed/mecha/component, turf/destination)
 	UnregisterSignal(component, COMSIG_QDELETING)
 	if(component == docked_golden)

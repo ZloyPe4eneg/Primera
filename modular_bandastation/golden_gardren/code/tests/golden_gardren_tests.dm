@@ -1,4 +1,3 @@
-/// Combining the pair seats each pilot by the half they came from, docks both halves without copies, and the halves do not outlive the frame.
 /datum/unit_test/golden_gardren_assemble
 
 /datum/unit_test/golden_gardren_assemble/Run()
@@ -36,7 +35,6 @@
 	TEST_ASSERT(!QDELETED(main_pilot) && isturf(main_pilot.loc), "The Gardren pilot was not ejected when the frame was destroyed")
 	TEST_ASSERT(!QDELETED(gunner) && isturf(gunner.loc), "The Golden pilot was not ejected when the frame was destroyed")
 
-/// A lone pilot cannot combine, and two pilots cannot combine without confirming.
 /datum/unit_test/golden_gardren_combine_requires_crew
 
 /datum/unit_test/golden_gardren_combine_requires_crew/Run()
@@ -55,7 +53,6 @@
 	TEST_ASSERT_EQUAL(gunner.loc, golden, "The halves combined without a confirmation")
 	TEST_ASSERT(!(golden in GLOB.golden_gardren_busy) && !(gardren in GLOB.golden_gardren_busy), "The cancelled request left the pair busy")
 
-/// Aiming the weapons seat's strike must not intercept the main pilot's punches or fire the arm weapon.
 /datum/unit_test/golden_gardren_melee_seat
 
 /datum/unit_test/golden_gardren_melee_seat/Run()
@@ -97,7 +94,6 @@
 	combined.mob_exit(gunner, silent = TRUE, forced = TRUE)
 	TEST_ASSERT(QDELETED(strike), "The absent gunner's targeting action was not cleaned up")
 
-/// The shield soaks damage from its own charge, collapses when emptied and cannot be raised right away.
 /datum/unit_test/golden_gardren_shield
 
 /datum/unit_test/golden_gardren_shield/Run()
@@ -116,7 +112,6 @@
 	TEST_ASSERT_EQUAL(combined.get_integrity(), start_integrity - 50, "Damage beyond the shield charge did not reach the hull")
 	TEST_ASSERT(!shield.toggle(operator), "The shield was raised again right after collapsing")
 
-/// The gunner of the combined mech and the pilot of the lone Golden raise the shield from their button, and it drops once they leave.
 /datum/unit_test/golden_gardren_shield_operators
 
 /datum/unit_test/golden_gardren_shield_operators/Run()
@@ -141,7 +136,6 @@
 		mech.mob_exit(operator, silent = TRUE)
 		TEST_ASSERT(!shield.active, "The shield of [mech] stayed up after its operator left")
 
-/// Changing seats counts as leaving the old one: a shield left without a gunner comes down.
 /datum/unit_test/golden_gardren_seat_swap_drops_shield
 
 /datum/unit_test/golden_gardren_seat_swap_drops_shield/Run()
@@ -155,7 +149,6 @@
 	combined.assign_seat(pilot, main_seat = TRUE)
 	TEST_ASSERT(!shield.active, "The shield stayed up after its only operator moved to the main seat")
 
-/// Separation gives back the same halves with their pilots and parts, spreads the damage and leaves no frame behind.
 /datum/unit_test/golden_gardren_separate
 
 /datum/unit_test/golden_gardren_separate/Run()
@@ -196,7 +189,6 @@
 	TEST_ASSERT_EQUAL(gardren.get_integrity(), round(gardren.max_integrity / 2), "The Gardren did not take its share of the damage")
 	TEST_ASSERT_EQUAL(golden.get_integrity(), round(golden.max_integrity / 2), "The Golden did not take its share of the damage")
 
-/// A frame that was not formed from the pair has no halves to give back.
 /datum/unit_test/golden_gardren_separate_spawned_frame
 
 /datum/unit_test/golden_gardren_separate_spawned_frame/Run()
@@ -212,8 +204,6 @@
 	TEST_ASSERT(!combined.disassemble(), "An admin-spawned frame separated into free halves")
 	TEST_ASSERT(!QDELETED(combined), "A failed separation deleted the frame")
 
-/// Returns the turf a rescue capsule carrying [pilot] is going to land on, or null if the pilot is not in a capsule.
-/// Waits out the burning countdown of a mech that took a lethal blow, up to a little longer than the countdown itself.
 /datum/unit_test/proc/golden_gardren_wait_for_blow_up(obj/vehicle/sealed/mecha/mech)
 	for(var/waited in 1 to 80)
 		if(QDELETED(mech))
@@ -228,7 +218,6 @@
 			return get_turf(zone)
 	return null
 
-/// Without a chosen spot the ejection fires both pilots in capsules onto separate free turfs right next to the mech, and knocks them down.
 /datum/unit_test/golden_gardren_emergency_eject
 
 /datum/unit_test/golden_gardren_emergency_eject/Run()
@@ -262,7 +251,6 @@
 		landings += landing
 	TEST_ASSERT(landings[1] != landings[2], "Both capsules were sent onto the same turf")
 
-/// A pilot can only pick a free, safe landing spot within range, and the capsule goes exactly there.
 /datum/unit_test/golden_gardren_eject_landing_choice
 
 /datum/unit_test/golden_gardren_eject_landing_choice/Run()
@@ -270,7 +258,6 @@
 	var/mob/living/carbon/human/consistent/main_pilot = allocate(/mob/living/carbon/human/consistent)
 	combined.mob_enter(main_pilot, silent = TRUE)
 	var/turf/frame_turf = combined.loc
-	// Two tiles away inside the test room, so the spot is in range and in sight.
 	var/turf/picked = locate(min(frame_turf.x + 2, run_loc_floor_top_right.x), frame_turf.y, frame_turf.z)
 	var/turf/far_away = locate(frame_turf.x + 10, frame_turf.y, frame_turf.z)
 	var/datum/component/golden_gardren_ejection/ejection = combined.GetComponent(/datum/component/golden_gardren_ejection)
@@ -279,7 +266,6 @@
 	TEST_ASSERT(ejection.start(main_pilot), "The ejection countdown did not start")
 	TEST_ASSERT(!ejection.choose_landing(main_pilot, frame_turf), "The mech's own turf was accepted as a landing spot")
 	TEST_ASSERT(!ejection.choose_landing(main_pilot, far_away), "A landing spot out of range was accepted")
-	// Some test maps keep the test room airless; there the same free floor must be refused as unsafe instead.
 	if(!is_safe_turf(picked, extended_safety_checks = TRUE))
 		TEST_ASSERT(!ejection.choose_landing(main_pilot, picked), "An unsafe landing spot was accepted")
 		ejection.eject()
@@ -292,7 +278,6 @@
 	TEST_ASSERT_EQUAL(golden_gardren_capsule_target(main_pilot, frame_turf), picked, "The capsule was not sent to the chosen spot")
 	TEST_ASSERT(!LAZYLEN(ejection.landings), "The landing choice outlived the ejection")
 
-/// A lethal blow sets the manned frame burning instead of destroying it at once; when it blows up, the pilots are fired clear instead of being deleted with it.
 /datum/unit_test/golden_gardren_destruction_ejects
 	priority = TEST_LONGER
 
@@ -324,7 +309,6 @@
 	TEST_ASSERT(QDELETED(core), "The wreck left behind a recoverable void core")
 	qdel(wreck)
 
-/// The lone Golden and Gardren carry the same capsules: the pilot gets the button, and a destroyed half fires its pilot clear.
 /datum/unit_test/golden_gardren_halves_eject
 	priority = TEST_LONGER
 
@@ -354,7 +338,6 @@
 		for(var/obj/structure/mecha_wreckage/wreck in half_turf)
 			qdel(wreck)
 
-/// The cockpit panel only runs each seat's own commands, whatever the client sends.
 /datum/unit_test/golden_gardren_cockpit_permissions
 
 /datum/unit_test/golden_gardren_cockpit_permissions/Run()
@@ -400,7 +383,6 @@
 	TEST_ASSERT_EQUAL(gun.projectiles, initial(gun.projectiles), "Reloading did not refill the magazine")
 	TEST_ASSERT_EQUAL(gun.projectiles_cache, 900 - gun.projectiles_per_shot, "Reloading used the wrong amount of reserve ammunition")
 
-/// Activated inside a mech of the pair the summon implant binds to it; a docked half answers through its frame.
 /datum/unit_test/golden_gardren_summon_link
 
 /datum/unit_test/golden_gardren_summon_link/Run()
@@ -417,7 +399,28 @@
 	gardren.forceMove(frame)
 	TEST_ASSERT_EQUAL(implant.get_linked_mech(), frame, "A docked half did not answer the summon through its frame")
 
-/// The summon refuses an occupied mech, and an empty one is dropped in a pod next to the summoner, never onto them.
+/datum/unit_test/golden_gardren_summon_cancel
+	normal_floor_required = TRUE
+
+/datum/unit_test/golden_gardren_summon_cancel/Run()
+	var/mob/living/carbon/human/consistent/summoner = allocate(/mob/living/carbon/human/consistent)
+	var/turf/origin = run_loc_floor_top_right
+	var/obj/vehicle/sealed/mecha/golden/golden = allocate(/obj/vehicle/sealed/mecha/golden, origin)
+	var/obj/item/implant/golden_gardren_summon/implant = allocate(/obj/item/implant/golden_gardren_summon)
+	TEST_ASSERT(implant.implant(summoner, null, silent = TRUE, force = TRUE), "The summon implant could not be implanted")
+	golden.mob_enter(summoner, silent = TRUE)
+	implant.activate("action_button")
+	golden.mob_exit(summoner, silent = TRUE)
+	summoner.forceMove(run_loc_floor_bottom_left)
+	implant.activate("action_button")
+	TEST_ASSERT(golden in GLOB.golden_gardren_busy, "The summon did not start takeoff")
+
+	qdel(implant)
+	TEST_ASSERT(!(golden in GLOB.golden_gardren_busy), "Removing the implant left the summoned mech reserved")
+	TEST_ASSERT_EQUAL(golden.loc, origin, "The cancelled summon moved the mech away")
+	TEST_ASSERT_EQUAL(golden.pixel_z, golden.base_pixel_z, "The cancelled summon left the mech above the floor")
+	TEST_ASSERT_EQUAL(golden.alpha, initial(golden.alpha), "The cancelled summon left the mech invisible")
+
 /datum/unit_test/golden_gardren_summon_drop
 	priority = TEST_LONGER
 	normal_floor_required = TRUE
@@ -458,7 +461,6 @@
 	TEST_ASSERT_EQUAL(stowaway.get_brute_loss() - stowaway_health, 10, "The impact dealt the wrong amount of damage")
 	TEST_ASSERT_EQUAL(summoner.get_brute_loss(), summoner_health, "The impact harmed someone on a neighbouring tile")
 
-/// The phase shift belongs to the pilot: it carries the mech through obstacles at an energy cost and keeps the hands idle while on.
 /datum/unit_test/golden_gardren_phasing
 
 /datum/unit_test/golden_gardren_phasing/Run()
@@ -499,7 +501,6 @@
 	gardren.mob_enter(gardren_pilot, silent = TRUE)
 	TEST_ASSERT_NOTNULL(LAZYACCESSASSOC(gardren.occupant_actions, gardren_pilot, /datum/action/vehicle/sealed/mecha/golden_gardren_phasing), "The Gardren pilot got no phase shift button")
 
-/// The fist seizes an adjacent target that rides along; squeezing chokes and then breaks bones; a click throws the target; a plain resist does not free it.
 /datum/unit_test/golden_gardren_fist
 	priority = TEST_LONGER
 
@@ -508,7 +509,6 @@
 	var/mob/living/carbon/human/consistent/pilot = allocate(/mob/living/carbon/human/consistent)
 	var/turf/target_turf = get_step(gardren.loc, EAST)
 	var/mob/living/carbon/human/consistent/target = allocate(/mob/living/carbon/human/consistent, target_turf)
-	// Consistent dummies act instantly; the grab and the escape are timed actions, so both use the live game's timing.
 	for(var/mob/living/carbon/human/consistent/actor as anything in list(pilot, target))
 		actor.add_or_update_variable_actionspeed_modifier(/datum/actionspeed_modifier/base, multiplicative_slowdown = 1)
 	gardren.mob_enter(pilot, silent = TRUE)
@@ -543,7 +543,6 @@
 	target.resist_buckle()
 	TEST_ASSERT_EQUAL(target.buckled, gardren, "A plain resist got the target out of the fist at once")
 
-	// The squeeze is driven by its processing tick; the test steps it second by second instead of waiting.
 	squeeze_button.Trigger()
 	TEST_ASSERT(fist.squeezing, "The squeeze button did not start squeezing the held target")
 	TEST_ASSERT(HAS_TRAIT(target, TRAIT_MUTE), "The squeezed target can still speak")
@@ -565,7 +564,6 @@
 	TEST_ASSERT(!HAS_TRAIT(target, TRAIT_MUTE) && !HAS_TRAIT(target, TRAIT_HANDS_BLOCKED), "The thrown target kept the fist's restraints")
 	TEST_ASSERT(target.get_brute_loss() > brute_before, "The throw did no damage")
 
-/// When the pilot leaves, the fist opens and puts the held target down in front of the mech.
 /datum/unit_test/golden_gardren_fist_release
 	priority = TEST_LONGER
 
@@ -580,7 +578,6 @@
 	var/datum/action/fist_button = LAZYACCESSASSOC(gardren.occupant_actions, pilot, /datum/action/vehicle/sealed/mecha/golden_gardren_fist)
 	fist_button.Trigger()
 	click_wrapper(pilot, target)
-	// Consistent dummies close the fist at once.
 	TEST_ASSERT_EQUAL(fist.held, target, "The fist did not seize the adjacent target")
 	var/datum/action/squeeze_button = LAZYACCESSASSOC(gardren.occupant_actions, pilot, /datum/action/vehicle/sealed/mecha/golden_gardren_fist_squeeze)
 	squeeze_button.Trigger()
@@ -592,7 +589,6 @@
 	TEST_ASSERT(!HAS_TRAIT(target, TRAIT_HANDS_BLOCKED) && !HAS_TRAIT(target, TRAIT_MUTE), "The released target kept the fist's restraints")
 	TEST_ASSERT_EQUAL(target.loc, target_turf, "The released target was not put down in front of the mech")
 
-/// The fist takes furniture, carries it in front of the mech and throws it, but leaves items and building parts alone.
 /datum/unit_test/golden_gardren_fist_objects
 
 /datum/unit_test/golden_gardren_fist_objects/Run()
@@ -606,7 +602,6 @@
 	var/datum/action/fist_button = LAZYACCESSASSOC(gardren.occupant_actions, pilot, /datum/action/vehicle/sealed/mecha/golden_gardren_fist)
 	fist_button.Trigger()
 
-	// Consistent dummies close the fist at once.
 	var/obj/item/wrench/wrench = allocate(/obj/item/wrench, front_turf)
 	click_wrapper(pilot, wrench)
 	TEST_ASSERT_NULL(fist.held, "The fist took an ordinary item")

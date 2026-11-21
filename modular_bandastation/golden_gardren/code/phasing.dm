@@ -1,8 +1,5 @@
-/// Lets the mech pass through obstacles under the same restrictions as the Phazon.
 /datum/component/golden_gardren_phasing
-	/// Whether the phase shift is on.
 	var/active = FALSE
-	/// Energy spent on every step while phasing.
 	var/energy_drain = 0.2 * STANDARD_CELL_CHARGE
 
 /datum/component/golden_gardren_phasing/Initialize()
@@ -51,7 +48,6 @@
 	mech.balloon_alert(pilot, "не во время фазового сдвига!")
 	return COMPONENT_CANCEL_EQUIPMENT_CLICK
 
-/// Turns the phase shift on or off on the pilot's request. Returns TRUE if the state changed.
 /datum/component/golden_gardren_phasing/proc/toggle(mob/user)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(!active)
@@ -76,7 +72,6 @@
 	set_phase_look(active)
 	golden_gardren_update_buttons(mech, /datum/action/vehicle/sealed/mecha/golden_gardren_phasing)
 
-/// Blurs the mech and makes it half see-through while it phases.
 /datum/component/golden_gardren_phasing/proc/set_phase_look(phasing)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(phasing)
@@ -86,7 +81,6 @@
 	mech.remove_filter("golden_gardren_phasing")
 	animate(mech, alpha = initial(mech.alpha), time = 0.3 SECONDS)
 
-/// Toggles the phase shift. The pilot's seat: movement belongs to them.
 /datum/action/vehicle/sealed/mecha/golden_gardren_phasing
 	name = "Фазовый сдвиг"
 	desc = "Проходить сквозь стены и препятствия. Каждый шаг расходует заряд. Во время сдвига руки и оружие недоступны."

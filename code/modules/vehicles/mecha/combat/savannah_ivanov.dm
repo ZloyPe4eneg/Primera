@@ -266,9 +266,7 @@
 	///how many rockets can we send with ivanov strike
 	var/rockets_left = 0
 	var/aiming_missile = FALSE
-	/// Optional supply pod subtype for the strike.
 	var/strike_pod_type
-	/// Explosion radii passed to the landing pod.
 	var/list/strike_explosion_size = list(0, 0, 1, 2)
 
 /datum/action/vehicle/sealed/mecha/ivanov_strike/Destroy()

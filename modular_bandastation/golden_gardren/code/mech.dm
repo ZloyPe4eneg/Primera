@@ -19,9 +19,7 @@
 		MECHA_POWER = 1,
 		MECHA_ARMOR = 1,
 	)
-	/// Power source installed when the chassis is spawned.
 	var/factory_cell_type = /obj/item/stock_parts/power_store/cell/bluespace
-	/// Whether the chassis vents extra smoke when it is destroyed.
 	var/heavy_emergency_smoke = FALSE
 
 /obj/vehicle/sealed/mecha/golden_gardren_base/Initialize(mapload, built_manually)
@@ -76,14 +74,12 @@
 	ejection?.eject(destroying = TRUE)
 	return ..()
 
-/// Moves support parts during docking and separation. The cell stays in its chassis.
 /obj/vehicle/sealed/mecha/golden_gardren_base/proc/transfer_support_parts(obj/vehicle/sealed/mecha/golden_gardren_base/destination)
 	for(var/obj/item/stock_parts/part in list(scanmod, capacitor, servo))
 		part.forceMove(destination)
 	locate_parts()
 	destination.locate_parts()
 
-/// Moving the pilot into the destination triggers occupant cleanup on the source.
 /obj/vehicle/sealed/mecha/golden_gardren_base/proc/transfer_pilot(obj/vehicle/sealed/mecha/golden_gardren_base/destination, mob/living/pilot)
 	if(!is_occupant(pilot) || pilot.loc != src)
 		return FALSE

@@ -1,4 +1,3 @@
-/// Opens the cockpit panel of the Golden-Gardren. Each seat sees the shared state and its own controls.
 /datum/action/vehicle/sealed/mecha/golden_gardren_cockpit
 	name = "Кабина"
 	desc = "Панель своего места: состояние машины и управление, доступное этому пилоту."
@@ -39,7 +38,6 @@
 		return UI_UPDATE
 	return UI_INTERACTIVE
 
-/// Returns "main", "weapons" or null for the seat [user] holds in the mech.
 /datum/golden_gardren_cockpit/proc/seat_of(mob/user)
 	if(!mech.is_occupant(user))
 		return null
@@ -64,10 +62,8 @@
 	data["shield_max_charge"] = shield.max_charge
 	data["ejecting"] = golden_gardren_is_ejecting(mech)
 	data["separate_blocker"] = mech.separate_blocker()
-	var/list/main_pilots = mech.return_drivers()
-	var/list/gunners = mech.return_controllers_with_flag(VEHICLE_CONTROL_EQUIPMENT)
-	var/mob/main_pilot = length(main_pilots) ? main_pilots[1] : null
-	var/mob/gunner = length(gunners) ? gunners[1] : null
+	var/mob/main_pilot = mech.find_seat_occupant(VEHICLE_CONTROL_DRIVE)
+	var/mob/gunner = mech.find_seat_occupant(VEHICLE_CONTROL_EQUIPMENT)
 	data["main_pilot"] = main_pilot?.name
 	data["gunner"] = gunner?.name
 	if(seat == "main")

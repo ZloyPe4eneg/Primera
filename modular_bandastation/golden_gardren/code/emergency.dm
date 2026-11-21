@@ -1,37 +1,17 @@
-/// Time the pilots have to pick a landing spot before they are fired out.
 #define GOLDEN_GARDREN_EJECT_DELAY (5 SECONDS)
-/// How far from the mech a capsule may land, in tiles.
 #define GOLDEN_GARDREN_EJECT_RANGE 5
-/// Knockdown the pilots get once their capsule opens.
 #define GOLDEN_GARDREN_EJECT_KNOCKDOWN (2 SECONDS)
-/// Time until a launched capsule opens, in three stages.
 #define GOLDEN_GARDREN_CAPSULE_TRANSIT (1 SECONDS)
 #define GOLDEN_GARDREN_CAPSULE_FALL (0.4 SECONDS)
 #define GOLDEN_GARDREN_CAPSULE_OPEN (0.5 SECONDS)
 
-/**
- * ## Golden-Gardren emergency ejection
- *
- * Rescue capsules of the Golden, the Gardren and the combined mech. The countdown gives every pilot time to click
- * the turf their capsule lands on; without a choice the capsule lands on a free turf right next to the mech.
- * A blow that would destroy a manned mech does not destroy it at once: the mech goes down burning and blows up
- * once the same countdown runs out, so the pilots get the time to aim their capsules.
- * The owner routes its pilots' clicks during the countdown, pilots leaving the seat, and its destruction through here.
- */
 /datum/component/golden_gardren_ejection
-	/// Timer of a running ejection countdown.
 	var/timer
-	/// Assoc list: pilot -> turf they picked for their capsule during the countdown.
 	var/list/landings
-	/// Assoc list: pilot -> landing marker image shown to that pilot only.
 	var/list/markers
-	/// Whether the mech has taken a lethal blow with pilots inside and blows up when the countdown runs out.
 	var/dying = FALSE
-	/// Type of visual particles for the countdown.
 	var/smoke_type = /particles/smoke/burning
-	/// Key reserved for this component so other smoke on the mech is unaffected.
 	var/smoke_key
-	/// Whether the failing chassis produces heavier smoke and leaves a cloud at the wreck.
 	var/heavy_smoke = FALSE
 
 /datum/component/golden_gardren_ejection/Initialize(heavy_smoke = FALSE)
@@ -58,7 +38,6 @@
 	landings = null
 	return ..()
 
-/// A blow that would destroy the manned mech puts it into its last countdown instead; a dying mech takes no more damage.
 /datum/component/golden_gardren_ejection/proc/on_take_damage(datum/source, damage_amount, damage_type, damage_flag, sound_effect, attack_dir, armour_penetration)
 	SIGNAL_HANDLER
 	var/obj/vehicle/sealed/mecha/mech = parent
@@ -69,10 +48,6 @@
 	start_dying()
 	return COMPONENT_NO_TAKE_DAMAGE
 
-/**
- * The mech goes down burning: it cannot move or fight, and it blows up when the ejection countdown runs out.
- * A countdown the pilots have already started themselves is not restarted.
- */
 /datum/component/golden_gardren_ejection/proc/start_dying()
 	var/obj/vehicle/sealed/mecha/mech = parent
 	dying = TRUE
@@ -85,7 +60,6 @@
 	playsound(mech, 'sound/machines/warning-buzzer.ogg', 100, FALSE)
 	start()
 
-/// On a lethal hit the chassis ejects the pilots as part of its destruction.
 /datum/component/golden_gardren_ejection/proc/finish_countdown()
 	if(!dying)
 		eject()
@@ -94,10 +68,6 @@
 	mech.update_integrity(0)
 	mech.atom_destruction()
 
-/**
- * Starts the countdown and lets the pilots aim their capsules. Returns FALSE if one is already running.
- * Without [user] the countdown was started by the mech itself going down.
- */
 /datum/component/golden_gardren_ejection/proc/start(mob/user)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(timer)
@@ -112,14 +82,12 @@
 	timer = addtimer(CALLBACK(src, PROC_REF(finish_countdown)), GOLDEN_GARDREN_EJECT_DELAY, TIMER_STOPPABLE)
 	return TRUE
 
-/// While the countdown runs, a pilot's click picks the landing turf instead of punching or shooting. Returns TRUE if the click was taken.
 /datum/component/golden_gardren_ejection/proc/handle_click(mob/user, atom/target)
 	if(!timer)
 		return FALSE
 	choose_landing(user, target)
 	return TRUE
 
-/// Returns why a capsule cannot land on [landing], or null if it can.
 /datum/component/golden_gardren_ejection/proc/landing_blocker(turf/landing)
 	var/turf/center = get_turf(parent)
 	if(!isturf(landing) || !center || landing.z != center.z)
@@ -136,7 +104,6 @@
 		return "опасное место"
 	return null
 
-/// Remembers the landing turf a pilot clicked and marks it for that pilot only.
 /datum/component/golden_gardren_ejection/proc/choose_landing(mob/user, atom/target)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(!timer || !mech.is_occupant(user))
@@ -159,7 +126,6 @@
 	mech.balloon_alert(user, "место посадки выбрано")
 	return TRUE
 
-/// Forgets a pilot's landing choice and gives the regular cursor back.
 /datum/component/golden_gardren_ejection/proc/clear_landing_choice(mob/user)
 	remove_landing_marker(user)
 	LAZYREMOVE(landings, user)
@@ -177,10 +143,6 @@
 	user.client.mouse_override_icon = aiming ? 'icons/effects/mouse_pointers/supplypod_down_target.dmi' : null
 	user.update_mouse_pointer()
 
-/**
- * Fires every occupant out: in a capsule to the turf they picked if it is still fine, otherwise to the nearest free neighbour.
- * Without [use_capsules] the pilots are put straight on their turfs, used when the mech is deleted outright.
- */
 /datum/component/golden_gardren_ejection/proc/eject(use_capsules = TRUE, destroying = FALSE)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	deltimer(timer)
@@ -190,7 +152,6 @@
 	var/launched = FALSE
 	for(var/mob/living/pilot as anything in mech.occupants?.Copy())
 		var/turf/landing = LAZYACCESS(landings, pilot)
-		// The picked turf may have turned unsafe or been taken during the countdown.
 		if(!landing || landing_blocker(landing) || (landing in taken_turfs))
 			landing = golden_gardren_find_exit_turf(mech, taken_turfs)
 		mech.mob_exit(pilot, silent = TRUE, forced = TRUE)
@@ -199,7 +160,6 @@
 		if(use_capsules)
 			var/capsule_time = landing ? GOLDEN_GARDREN_CAPSULE_TRANSIT + GOLDEN_GARDREN_CAPSULE_FALL + GOLDEN_GARDREN_CAPSULE_OPEN : 0
 			pilot.Knockdown(GOLDEN_GARDREN_EJECT_KNOCKDOWN + capsule_time)
-		// Without any free turf around the pilot stays where the base exit put them, on the mech's own turf.
 		if(!landing)
 			continue
 		taken_turfs += landing
@@ -217,7 +177,6 @@
 		if(origin)
 			new /obj/effect/temp_visual/golden_gardren_smoke(origin)
 
-/// Sends a pilot to [landing] in a rescue capsule that harms nothing where it lands and vanishes after opening.
 /datum/component/golden_gardren_ejection/proc/launch_capsule(mob/living/pilot, turf/landing)
 	return podspawn(list(
 		"target" = landing,
@@ -233,35 +192,31 @@
 		),
 	))
 
-/// Whether the ejection countdown of [mech] is running.
 /proc/golden_gardren_is_ejecting(obj/vehicle/sealed/mecha/mech)
 	var/datum/component/golden_gardren_ejection/ejection = mech.GetComponent(/datum/component/golden_gardren_ejection)
 	return !!ejection?.timer
 
-/**
- * Picks a turf next to [mech] a pilot or a half can be put on: a safe one if there is any, otherwise any passable one.
- * Turfs in [exclude] are skipped so two things do not land on the same turf. Returns null if no neighbour fits.
- */
-/proc/golden_gardren_find_exit_turf(atom/mech, list/exclude)
+/proc/golden_gardren_find_exit_turf(atom/mech, list/exclude, first_available = FALSE)
 	var/turf/center = get_turf(mech)
 	if(!center)
 		return null
-	var/list/safe_turfs = list()
-	var/list/passable_turfs = list()
+	var/list/safe_turfs
+	var/list/passable_turfs
 	for(var/turf/candidate in orange(1, center))
 		if((candidate in exclude) || candidate.is_blocked_turf(exclude_mobs = TRUE) || !center.Adjacent(candidate))
 			continue
+		if(first_available)
+			return candidate
 		if(is_safe_turf(candidate, extended_safety_checks = TRUE))
-			safe_turfs += candidate
-		else
-			passable_turfs += candidate
+			LAZYADD(safe_turfs, candidate)
+		else if(!length(safe_turfs))
+			LAZYADD(passable_turfs, candidate)
 	if(length(safe_turfs))
 		return pick(safe_turfs)
 	if(length(passable_turfs))
 		return pick(passable_turfs)
 	return null
 
-/// Starts the ejection countdown. During it each pilot clicks the turf their capsule lands on.
 /datum/action/vehicle/sealed/mecha/golden_gardren_emergency_eject
 	name = "АВАРИЙНОЕ КАТАПУЛЬТИРОВАНИЕ"
 	desc = "Запускает отсчёт до выброса пилотов в капсулах. До выброса каждый пилот может кликом выбрать безопасную клетку посадки поблизости. Отменить нельзя."

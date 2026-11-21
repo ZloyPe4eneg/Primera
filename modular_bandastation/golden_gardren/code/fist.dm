@@ -1,29 +1,16 @@
-/// Time the fist takes to close on a target.
 #define GOLDEN_GARDREN_FIST_GRAB_TIME (1 SECONDS)
-/// Time a held target needs to wrench itself free.
 #define GOLDEN_GARDREN_FIST_ESCAPE_TIME (8 SECONDS)
-/// Time someone standing next to the mech needs to pry a held target free.
 #define GOLDEN_GARDREN_FIST_RESCUE_TIME (4 SECONDS)
-/// How far the fist throws what it holds, in tiles.
 #define GOLDEN_GARDREN_FIST_THROW_RANGE 7
-/// Brute damage the throw itself deals to a thrown body, before whatever it hits on landing.
 #define GOLDEN_GARDREN_FIST_THROW_DAMAGE 10
-/// Brute damage a thrown object deals to whoever it hits.
 #define GOLDEN_GARDREN_FIST_OBJECT_HIT_DAMAGE 20
-/// Oxygen damage per second while the fist squeezes: the target cannot breathe.
 #define GOLDEN_GARDREN_FIST_CHOKE_RATE 4
-/// How long the fist has to squeeze before the bones start to give.
 #define GOLDEN_GARDREN_FIST_CRUSH_DELAY (8 SECONDS)
-/// Brute damage per second to the chest once the bones give.
 #define GOLDEN_GARDREN_FIST_CRUSH_RATE 3
-/// How often a crushing squeeze breaks the bones one stage further.
 #define GOLDEN_GARDREN_FIST_FRACTURE_INTERVAL (6 SECONDS)
-/// Damage per second a squeezed object takes until it breaks.
 #define GOLDEN_GARDREN_FIST_OBJECT_CRUSH_RATE 25
-/// Trait source for everything the fist does to its target.
 #define GOLDEN_GARDREN_FIST_TRAIT "golden_gardren_fist"
 
-/// Objects the fist does not take: building parts and materials, wiring and pipes, signs and other fixtures of the station itself.
 GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	/obj/structure/broken_flooring,
 	/obj/structure/cable,
@@ -58,39 +45,17 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	/obj/structure/window,
 )))
 
-/**
- * ## Golden-Gardren fist
- *
- * A Titanfall-style mech fist for the pilot of the Gardren or the combined mech. In grab mode the pilot's hand click
- * on an adjacent target closes the fist on it instead of punching. The fist takes living beings and large loose objects
- * such as furniture, lockers or portable machines, but not items, building parts or fixtures of the station.
- * Whatever it holds is carried in front of the mech; a held body cannot use its hands.
- * Holding something, the pilot can throw it hard with a click anywhere ahead, or squeeze: a body chokes and,
- * if the squeeze goes on long enough, its bones start to break; an object is crushed until it breaks.
- * A held body needs time to wrench itself free; anyone next to a mech that stands still can pry it out faster with a non-combat hand click.
- */
 /datum/component/golden_gardren_fist
-	/// How far in front of the mech's sprite a held thing is drawn, in pixels.
 	var/reach = 16
-	/// Whether the pilot's hand clicks close the fist instead of punching.
 	var/grab_mode = FALSE
-	/// Whatever the fist holds right now: a living being or an object.
 	var/atom/movable/held
-	/// Whether the fist is closing on something right now.
 	var/grabbing = FALSE
-	/// Whether someone is trying to get the held body out right now.
 	var/escaping = FALSE
-	/// Set while the fist itself carries a held object along, so that move is not taken for someone else taking it.
 	var/carrying = FALSE
-	/// Pixel offsets and layer of a held object before the fist lifted it.
 	var/list/held_object_look
-	/// Whether the fist squeezes whatever it holds.
 	var/squeezing = FALSE
-	/// For how long the current squeeze has gone on, in deciseconds.
 	var/squeeze_time = 0
-	/// Bone wound severity the squeeze has reached on the held body.
 	var/fracture_stage = WOUND_SEVERITY_TRIVIAL
-	/// Squeeze time at which the bones give one stage further.
 	var/next_fracture_time = 0
 
 /datum/component/golden_gardren_fist/Initialize(reach = 16)
@@ -112,10 +77,9 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	STOP_PROCESSING(SSobj, src)
 	return ..()
 
-/// Whether [pilot] sits in the seat that owns the fist.
 /datum/component/golden_gardren_fist/proc/is_fist_pilot(mob/living/pilot)
 	var/obj/vehicle/sealed/mecha/mech = parent
-	return pilot in mech.return_controllers_with_flag(VEHICLE_CONTROL_MELEE)
+	return !!(LAZYACCESS(mech.occupants, pilot) & VEHICLE_CONTROL_MELEE)
 
 /datum/component/golden_gardren_fist/proc/on_melee_click(datum/source, mob/living/pilot, atom/target, on_cooldown, is_adjacent)
 	SIGNAL_HANDLER
@@ -131,7 +95,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	INVOKE_ASYNC(src, PROC_REF(try_grab), pilot, target)
 	return COMPONENT_CANCEL_MELEE_CLICK
 
-/// A pilot who also holds the weapons throws with the click instead of shooting while the fist holds something.
 /datum/component/golden_gardren_fist/proc/on_equipment_click(datum/source, mob/living/pilot, atom/target)
 	SIGNAL_HANDLER
 	if(!held || !is_fist_pilot(pilot))
@@ -139,7 +102,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	INVOKE_ASYNC(src, PROC_REF(throw_held), pilot, target)
 	return COMPONENT_CANCEL_EQUIPMENT_CLICK
 
-/// A non-combat hand click on the mech by someone outside pries the held body out.
 /datum/component/golden_gardren_fist/proc/on_attack_hand(datum/source, mob/living/user, list/modifiers)
 	SIGNAL_HANDLER
 	if(!isliving(held) || user == held || user.combat_mode || user.loc == parent)
@@ -147,7 +109,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	INVOKE_ASYNC(src, PROC_REF(try_free), user)
 	return COMPONENT_CANCEL_ATTACK_CHAIN
 
-/// Returns why [pilot] cannot seize [target] right now, or null if they can.
 /datum/component/golden_gardren_fist/proc/grab_blocker(mob/living/pilot, atom/movable/target)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(QDELETED(target) || QDELETED(pilot))
@@ -173,7 +134,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		return "не во время фазового сдвига"
 	return null
 
-/// Whether [thing] is a large loose object the fist may take: furniture, lockers, portable machines and the like.
 /datum/component/golden_gardren_fist/proc/is_grabbable_object(atom/movable/thing)
 	if(!isstructure(thing) && !(ismachinery(thing) && !thing.anchored))
 		return FALSE
@@ -184,7 +144,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		return FALSE
 	return TRUE
 
-/// Closes the fist on [target] after a short wind-up, rechecking everything once it closes.
 /datum/component/golden_gardren_fist/proc/try_grab(mob/living/pilot, atom/movable/target)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	var/blocker = grab_blocker(pilot, target)
@@ -194,7 +153,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	grabbing = TRUE
 	mech.visible_message(span_warning("[mech.declent_ru(NOMINATIVE)] тянется кулаком к [target.declent_ru(DATIVE)]!"))
 	playsound(mech, 'sound/vehicles/mecha/hydraulic.ogg', 50, TRUE)
-	// A body can still dodge: stepping away before the fist closes breaks the grab.
 	var/closed = do_after(pilot, GOLDEN_GARDREN_FIST_GRAB_TIME, target = target)
 	grabbing = FALSE
 	if(!closed || QDELETED(mech))
@@ -205,7 +163,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		return FALSE
 	return grab(target, pilot)
 
-/// Seizes [target] and lifts it in front of the mech. A body rides along buckled and cannot use its hands; an object is carried along.
 /datum/component/golden_gardren_fist/proc/grab(atom/movable/target, mob/living/pilot)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(isliving(target))
@@ -220,7 +177,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		var/obj/object = target
 		held = object
 		held_object_look = list(object.pixel_w, object.pixel_z, object.layer)
-		// Furniture bolted to the floor is torn loose.
 		if(object.anchored)
 			object.set_anchored(FALSE)
 		carrying = TRUE
@@ -237,7 +193,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	update_buttons()
 	return TRUE
 
-/// Draws the held thing in front of the mech's sprite for the given facing.
 /datum/component/golden_gardren_fist/proc/show_in_front(facing)
 	var/front_w = 0
 	var/front_z = 0
@@ -260,7 +215,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	var/obj/vehicle/sealed/mecha/mech = parent
 	object.pixel_w = held_object_look[1] + front_w
 	object.pixel_z = held_object_look[2] + front_z
-	// Facing away the object is behind the mech, otherwise in front of it.
 	object.layer = facing == NORTH ? mech.layer - 0.01 : mech.layer + 0.01
 
 /datum/component/golden_gardren_fist/proc/on_mech_turned(datum/source, old_dir, new_dir)
@@ -268,7 +222,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	if(held && old_dir != new_dir)
 		show_in_front(new_dir)
 
-/// Carries a held object along with the mech.
 /datum/component/golden_gardren_fist/proc/on_mech_moved(datum/source, atom/old_loc, movement_dir, forced)
 	SIGNAL_HANDLER
 	var/obj/vehicle/sealed/mecha/mech = parent
@@ -278,25 +231,21 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	held.forceMove(mech.loc)
 	carrying = FALSE
 
-/// Anything else moving the held object away takes it out of the fist.
 /datum/component/golden_gardren_fist/proc/on_held_object_moved(datum/source, atom/old_loc, movement_dir, forced)
 	SIGNAL_HANDLER
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(!carrying && held && held.loc != mech.loc)
 		forget_held()
 
-/// Opens the fist and returns what it held, free of everything the fist did to it.
 /datum/component/golden_gardren_fist/proc/let_go()
 	var/obj/vehicle/sealed/mecha/mech = parent
 	var/atom/movable/freed = held
-	// Unbuckling a body comes back through on_held_unbuckled(), which forgets it.
 	if(isliving(freed))
 		mech.unbuckle_mob(freed, force = TRUE)
 	else
 		forget_held()
 	return freed
 
-/// Lets go of what the fist holds in front of the mech.
 /datum/component/golden_gardren_fist/proc/release()
 	if(!held)
 		return
@@ -312,7 +261,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	else
 		mech.visible_message(span_notice("[mech.declent_ru(NOMINATIVE)] ставит [dropped.declent_ru(ACCUSATIVE)]."))
 
-/// Hurls what the fist holds towards [target] with the full swing of the arm.
 /datum/component/golden_gardren_fist/proc/throw_held(mob/living/pilot, atom/target)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(!held || !is_fist_pilot(pilot))
@@ -333,7 +281,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		body.apply_damage(GOLDEN_GARDREN_FIST_THROW_DAMAGE, BRUTE, BODY_ZONE_CHEST, body.run_armor_check(BODY_ZONE_CHEST, MELEE))
 		body.Knockdown(3 SECONDS)
 	else
-		// A thrown object hurts whoever it lands on; the hooks only last for this throw.
 		RegisterSignal(thrown, COMSIG_MOVABLE_IMPACT, PROC_REF(on_thrown_object_impact))
 		RegisterSignal(thrown, COMSIG_MOVABLE_THROW_LANDED, PROC_REF(on_thrown_object_landed))
 	thrown.throw_at(aim, GOLDEN_GARDREN_FIST_THROW_RANGE, 2, mech, TRUE, FALSE, null, MOVE_FORCE_OVERPOWERING)
@@ -355,7 +302,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	SIGNAL_HANDLER
 	UnregisterSignal(source, list(COMSIG_MOVABLE_IMPACT, COMSIG_MOVABLE_THROW_LANDED))
 
-/// Starts or stops squeezing whatever the fist holds.
 /datum/component/golden_gardren_fist/proc/toggle_squeeze(mob/living/pilot)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(!held)
@@ -370,7 +316,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		return FALSE
 	squeezing = TRUE
 	squeeze_time = 0
-	// A chest cannot be dislocated, so the first crack is already a fracture.
 	fracture_stage = WOUND_SEVERITY_MODERATE
 	next_fracture_time = GOLDEN_GARDREN_FIST_CRUSH_DELAY
 	START_PROCESSING(SSobj, src)
@@ -393,10 +338,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		REMOVE_TRAIT(held, TRAIT_MUTE, GOLDEN_GARDREN_FIST_TRAIT)
 	update_buttons()
 
-/**
- * A squeezed object takes damage until it breaks.
- * A squeezed body chokes from the start; held long enough, its chest is crushed and the bones break one stage at a time.
- */
 /datum/component/golden_gardren_fist/process(seconds_per_tick)
 	if(!held || !squeezing)
 		stop_squeeze()
@@ -423,7 +364,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	playsound(body, 'sound/effects/wounds/crack1.ogg', 75, TRUE)
 	body.visible_message(span_danger("Из кулака [mech.declent_ru(GENITIVE)] раздаётся хруст костей!"), span_userdanger("Ваши кости трещат под давлением кулака!"))
 
-/// Someone tries to get the held body out: the body itself, or anyone next to the mech.
 /datum/component/golden_gardren_fist/proc/try_free(mob/living/user)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(!isliving(held) || escaping)
@@ -433,7 +373,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 		return
 	escaping = TRUE
 	user.visible_message(span_warning((self_escape ? "[user.declent_ru(NOMINATIVE)] пытается вырваться из кулака!" : "[user.declent_ru(NOMINATIVE)] пытается разжать кулак [mech.declent_ru(GENITIVE)]!")))
-	// The held body is carried along, so walking does not reset its own attempt; a rescuer has to keep up with a mech that stands still.
 	var/freed = self_escape \
 		? do_after(user, GOLDEN_GARDREN_FIST_ESCAPE_TIME, target = mech, timed_action_flags = IGNORE_USER_LOC_CHANGE | IGNORE_TARGET_LOC_CHANGE) \
 		: do_after(user, GOLDEN_GARDREN_FIST_RESCUE_TIME, target = mech)
@@ -452,7 +391,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	SIGNAL_HANDLER
 	forget_held()
 
-/// Undoes everything the fist did to what it held and lets go of the reference.
 /datum/component/golden_gardren_fist/proc/forget_held()
 	if(!held)
 		return
@@ -472,7 +410,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	held = null
 	update_buttons()
 
-/// Switches between punching and grabbing, or lets go if the fist holds something.
 /datum/component/golden_gardren_fist/proc/toggle(mob/user)
 	var/obj/vehicle/sealed/mecha/mech = parent
 	if(held)
@@ -486,10 +423,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	golden_gardren_update_buttons(parent, /datum/action/vehicle/sealed/mecha/golden_gardren_fist)
 	golden_gardren_update_buttons(parent, /datum/action/vehicle/sealed/mecha/golden_gardren_fist_squeeze)
 
-/**
- * Routes [/atom/movable/proc/user_unbuckle_mob] of a mech with a fist: a held body is not simply unbuckled, it has to break free.
- * Returns TRUE if the fist took over the attempt.
- */
 /proc/golden_gardren_fist_intercept_unbuckle(obj/vehicle/sealed/mecha/mech, mob/living/buckled_mob, mob/user)
 	var/datum/component/golden_gardren_fist/fist = mech.GetComponent(/datum/component/golden_gardren_fist)
 	if(!fist?.held || fist.held != buckled_mob)
@@ -497,12 +430,10 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	INVOKE_ASYNC(fist, TYPE_PROC_REF(/datum/component/golden_gardren_fist, try_free), user)
 	return TRUE
 
-/// Lets go of whatever the fist of [mech] holds. Used whenever the mech is about to move in a way a held thing cannot follow.
 /proc/golden_gardren_release_fist(obj/vehicle/sealed/mecha/mech)
 	var/datum/component/golden_gardren_fist/fist = mech.GetComponent(/datum/component/golden_gardren_fist)
 	fist?.release()
 
-/// Switches the fist between punching and grabbing, or opens it if it holds something. The pilot's seat.
 /datum/action/vehicle/sealed/mecha/golden_gardren_fist
 	name = "Кулак"
 	desc = "Переключает кулак между ударом и захватом: в режиме захвата клик по соседней цели — живой или крупному предмету вроде стола или шкафа — хватает её. Схваченное мех носит перед собой; клик в любую точку впереди швыряет его туда. Повторное нажатие разжимает кулак."
@@ -522,7 +453,6 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	button_icon_state = fist?.held ? "fist_holding" : (fist?.grab_mode ? "fist_grab" : "fist_punch")
 	return ..()
 
-/// Squeezes whatever the fist holds, or eases the grip. The pilot's seat.
 /datum/action/vehicle/sealed/mecha/golden_gardren_fist_squeeze
 	name = "Сжатие"
 	desc = "Сжать кулак: живая цель задыхается, а если держать долго — начинают ломаться кости; предмет сминается, пока не сломается. Повторное нажатие ослабляет хватку."
