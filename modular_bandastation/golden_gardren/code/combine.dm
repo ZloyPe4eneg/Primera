@@ -44,11 +44,14 @@ GLOBAL_LIST_EMPTY(golden_gardren_busy)
 		return "пара не найдена"
 	if(!isturf(golden.loc) || !isturf(gardren.loc) || golden.z != gardren.z || get_dist(golden, gardren) > 1)
 		return "мехи должны стоять рядом"
-	for(var/obj/vehicle/sealed/mecha/mech as anything in list(golden, gardren))
+	for(var/obj/vehicle/sealed/mecha/golden_gardren_base/mech as anything in list(golden, gardren))
 		if(mech.get_integrity() <= 0 || mech.completely_disabled)
 			return "[mech.name] неисправен"
 		if(mech.is_currently_ejecting || golden_gardren_is_ejecting(mech))
 			return "[mech.name] занят"
+		var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/gun = mech.get_machine_gun()
+		if(gun?.firing_burst)
+			return "[mech.name] ещё ведёт огонь из пулемёта"
 		if(!golden_gardren_pilot(mech))
 			return length(mech.occupants) ? "пилот [mech.name] не в состоянии управлять" : "в [mech.name] нет пилота"
 	return null

@@ -150,6 +150,8 @@ GLOBAL_LIST_INIT(golden_gardren_fist_forbidden, typecacheof(list(
 	if(blocker)
 		mech.balloon_alert(pilot, blocker)
 		return FALSE
+	if(!isliving(target))
+		return grab(target, pilot)
 	grabbing = TRUE
 	mech.visible_message(span_warning("[mech.declent_ru(NOMINATIVE)] тянется кулаком к [target.declent_ru(DATIVE)]!"))
 	playsound(mech, 'sound/vehicles/mecha/hydraulic.ogg', 50, TRUE)

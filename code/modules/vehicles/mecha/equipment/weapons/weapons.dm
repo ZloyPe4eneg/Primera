@@ -410,6 +410,17 @@
 	harmful = TRUE
 	ammo_type = MECHA_AMMO_LMG
 	custom_materials = list(/datum/material/iron = SHEET_MATERIAL_AMOUNT * 5)
+	var/firing_burst = FALSE
+
+/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/action(mob/source, atom/target, list/modifiers)
+	if(firing_burst)
+		return FALSE
+	firing_burst = TRUE
+	var/burst_size = projectiles_per_shot
+	projectiles_per_shot = min(projectiles, burst_size)
+	. = ..()
+	projectiles_per_shot = burst_size
+	firing_burst = FALSE
 
 /// Missiles
 /// SRM-8 Missile Rack - Used by Nuclear Operatives - Explodes when it hits anything

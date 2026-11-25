@@ -5,10 +5,8 @@
 	icon = 'modular_bandastation/golden_gardren/icons/golden.dmi'
 	icon_state = "golden"
 	base_icon_state = "golden"
-	SET_BASE_PIXEL(-4, 0)
 	movedelay = 2.7
 	max_integrity = 200
-	armor_type = /datum/armor/mecha_marauder
 	force = 15
 	exit_delay = 30
 	wreckage = /obj/structure/mecha_wreckage/golden

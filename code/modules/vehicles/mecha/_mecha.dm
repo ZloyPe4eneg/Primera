@@ -49,6 +49,7 @@
 	var/equipment_disabled = FALSE
 	/// Keeps track of the mech's cell
 	var/obj/item/stock_parts/power_store/cell
+	var/factory_cell_type = /obj/item/stock_parts/power_store/cell/high
 	var/removable_cell = TRUE
 	/// Keeps track of the mech's scanning module
 	var/obj/item/stock_parts/scanning_module/scanmod
@@ -163,6 +164,7 @@
 	var/safety_sound_custom = FALSE
 
 	// Action vars
+	var/equipment_action_control_flag = VEHICLE_CONTROL_SETTINGS
 	/// Ref to any active thrusters we might have
 	var/obj/item/mecha_parts/mecha_equipment/thrusters/active_thrusters
 
@@ -288,7 +290,7 @@
 
 /// Add parts on mech spawning. Skipped in manual construction.
 /obj/vehicle/sealed/mecha/proc/populate_parts()
-	cell = new /obj/item/stock_parts/power_store/cell/high(src)
+	cell = new factory_cell_type(src)
 	scanmod = new /obj/item/stock_parts/scanning_module(src)
 	capacitor = new /obj/item/stock_parts/capacitor(src)
 	servo = new /obj/item/stock_parts/servo(src)
@@ -365,9 +367,8 @@
 	remove_all_equipment_actions(M)
 	return ..()
 
-/// Generates action buttons for all eligible equipment and grants them to the occupant with VEHICLE_CONTROL_SETTINGS flag.
 /obj/vehicle/sealed/mecha/proc/generate_equipment_actions(mob/occupant)
-	if(!(occupant in occupants) || !(occupants[occupant] & VEHICLE_CONTROL_SETTINGS))
+	if(!(occupant in occupants) || !(occupants[occupant] & equipment_action_control_flag))
 		return
 	for(var/obj/item/mecha_parts/mecha_equipment/equipment in flat_equipment)
 		if(!is_equipment_valid_for_action(equipment))
@@ -400,16 +401,12 @@
 	// Use equipment type as actiontype for remove_action_type_from_mob() compatibility
 	occupant_actions[occupant][equipment.type] = action
 
-/**
- * Called when equipment is attached to the mecha.
- * Grants equipment actions to current occupants with VEHICLE_CONTROL_SETTINGS flag.
- */
 /obj/vehicle/sealed/mecha/proc/on_equipment_attach(obj/item/mecha_parts/mecha_equipment/equipment)
 	if(!is_equipment_valid_for_action(equipment))
 		return
 
 	for(var/mob/occupant in occupants)
-		if(!(occupants[occupant] & VEHICLE_CONTROL_SETTINGS))
+		if(!(occupants[occupant] & equipment_action_control_flag))
 			continue
 		grant_equipment_action(occupant, equipment)
 

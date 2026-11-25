@@ -21,6 +21,9 @@
 		return "мех неисправен"
 	if(is_currently_ejecting || golden_gardren_is_ejecting(src) || (!ignore_busy && (src in GLOB.golden_gardren_busy)))
 		return "мех занят"
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/gun = get_machine_gun()
+	if(gun?.firing_burst)
+		return "дождитесь окончания пулемётной очереди"
 	if(occupant_amount() < max_occupants)
 		return "для разделения нужны два пилота"
 	for(var/mob/living/pilot as anything in occupants)
@@ -72,6 +75,7 @@
 	undock_component(gardren, frame_turf)
 	undock_component(golden, golden_turf)
 	transfer_support_parts(gardren)
+	return_machine_gun_ammo(golden, gardren, frame_turf)
 	gardren.update_integrity(max(1, round(gardren.max_integrity * integrity_share)))
 	golden.update_integrity(max(1, round(golden.max_integrity * integrity_share)))
 
@@ -92,6 +96,22 @@
 	log_message("Separated into [golden] and [gardren].", LOG_MECHA)
 	qdel(src)
 	return TRUE
+
+/obj/vehicle/sealed/mecha/golden_gardren/proc/return_machine_gun_ammo(obj/vehicle/sealed/mecha/golden/golden, obj/vehicle/sealed/mecha/gardren/gardren, turf/drop_turf)
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/source = get_machine_gun()
+	if(!source)
+		return
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/golden_gun = golden.get_machine_gun()
+	var/share = CEILING((source.projectiles + source.projectiles_cache) / 2, 1)
+	golden_gardren_transfer_ammo(source, golden_gun, share)
+	golden_gardren_transfer_ammo(source, gardren.get_machine_gun())
+	golden_gardren_transfer_ammo(source, golden_gun)
+	var/overflow = source.projectiles + source.projectiles_cache
+	if(overflow > 0)
+		var/obj/item/mecha_ammo/lmg/ammo_box = new(drop_turf)
+		ammo_box.rounds = overflow
+		ammo_box.qdel_on_empty = TRUE
+		ammo_box.set_custom_materials(null)
 
 /obj/vehicle/sealed/mecha/golden_gardren/proc/undock_component(obj/vehicle/sealed/mecha/component, turf/destination)
 	UnregisterSignal(component, COMSIG_QDELETING)

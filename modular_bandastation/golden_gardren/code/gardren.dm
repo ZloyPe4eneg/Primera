@@ -5,10 +5,8 @@
 	icon = 'modular_bandastation/golden_gardren/icons/gardren.dmi'
 	icon_state = "gardren"
 	base_icon_state = "gardren"
-	SET_BASE_PIXEL(-4, 0)
 	movedelay = 2.35
 	max_integrity = 250
-	armor_type = /datum/armor/mecha_marauder
 	force = 25
 	wreckage = /obj/structure/mecha_wreckage/gardren
 

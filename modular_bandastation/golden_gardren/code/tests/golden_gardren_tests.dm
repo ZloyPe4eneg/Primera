@@ -13,6 +13,7 @@
 
 	var/obj/vehicle/sealed/mecha/golden_gardren/combined = allocate(/obj/vehicle/sealed/mecha/golden_gardren, null, TRUE)
 	TEST_ASSERT(combined.assemble(golden, gardren, gunner, main_pilot), "Assembly failed with both pilots in place")
+	assert_golden_gardren_loadout(combined)
 
 	TEST_ASSERT_EQUAL(gunner.loc, combined, "The Golden pilot was not moved into the frame")
 	TEST_ASSERT_EQUAL(main_pilot.loc, combined, "The Gardren pilot was not moved into the frame")
@@ -34,6 +35,99 @@
 	TEST_ASSERT(QDELETED(gardren), "Destroying the frame left a free Gardren behind")
 	TEST_ASSERT(!QDELETED(main_pilot) && isturf(main_pilot.loc), "The Gardren pilot was not ejected when the frame was destroyed")
 	TEST_ASSERT(!QDELETED(gunner) && isturf(gunner.loc), "The Golden pilot was not ejected when the frame was destroyed")
+
+/datum/unit_test/proc/assert_golden_gardren_loadout(obj/vehicle/sealed/mecha/golden_gardren_base/mech)
+	var/expected_laser = istype(mech, /obj/vehicle/sealed/mecha/golden_gardren) ? /obj/item/mecha_parts/mecha_equipment/weapon/energy/laser/heavy/golden_gardren : /obj/item/mecha_parts/mecha_equipment/weapon/energy/laser
+	var/obj/item/mecha_parts/mecha_equipment/weapon/laser = mech.equip_by_category[MECHA_L_ARM]
+	TEST_ASSERT_EQUAL(laser?.type, expected_laser, "[mech] has the wrong laser")
+	TEST_ASSERT_NOTNULL(mech.get_machine_gun(), "[mech] has no right-arm Ultra AC 2")
+	TEST_ASSERT(istype(mech.active_thrusters, /obj/item/mecha_parts/mecha_equipment/thrusters/ion), "[mech] does not have ion thrusters enabled")
+	TEST_ASSERT_NOTNULL(locate(/obj/item/mecha_parts/mecha_equipment/repair_droid) in mech.equip_by_category[MECHA_UTILITY], "[mech] has no repair droid")
+	TEST_ASSERT_NOTNULL(locate(/obj/item/mecha_parts/mecha_equipment/armor/antiproj_armor_booster) in mech.equip_by_category[MECHA_ARMOR], "[mech] has no projectile shielding")
+	TEST_ASSERT_EQUAL(length(mech.flat_equipment), 5, "[mech] has an unexpected factory module")
+
+/datum/unit_test/golden_gardren_loadout
+
+/datum/unit_test/golden_gardren_loadout/Run()
+	for(var/mech_type in list(/obj/vehicle/sealed/mecha/golden, /obj/vehicle/sealed/mecha/gardren, /obj/vehicle/sealed/mecha/golden_gardren))
+		var/obj/vehicle/sealed/mecha/golden_gardren_base/mech = allocate(mech_type)
+		assert_golden_gardren_loadout(mech)
+
+/datum/unit_test/golden_gardren_ammo_roundtrip
+
+/datum/unit_test/golden_gardren_ammo_roundtrip/Run()
+	var/obj/vehicle/sealed/mecha/golden/golden = allocate(/obj/vehicle/sealed/mecha/golden)
+	var/obj/vehicle/sealed/mecha/gardren/gardren = allocate(/obj/vehicle/sealed/mecha/gardren)
+	var/mob/living/carbon/human/consistent/gunner = allocate(/mob/living/carbon/human/consistent)
+	var/mob/living/carbon/human/consistent/driver = allocate(/mob/living/carbon/human/consistent)
+	golden.mob_enter(gunner, silent = TRUE)
+	gardren.mob_enter(driver, silent = TRUE)
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/golden_gun = golden.get_machine_gun()
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/gardren_gun = gardren.get_machine_gun()
+	golden_gun.projectiles = 120
+	golden_gun.projectiles_cache = 130
+	gardren_gun.projectiles = 100
+	gardren_gun.projectiles_cache = 152
+
+	var/obj/vehicle/sealed/mecha/golden_gardren/combined = allocate(/obj/vehicle/sealed/mecha/golden_gardren, null, TRUE)
+	TEST_ASSERT(combined.assemble(golden, gardren, gunner, driver), "Assembly failed with a partially expended stock")
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/combined_gun = combined.get_machine_gun()
+	TEST_ASSERT_EQUAL(combined_gun.projectiles, 300, "Assembly did not fill the combined magazine from the pooled ammo")
+	TEST_ASSERT_EQUAL(combined_gun.projectiles_cache, 202, "Assembly did not preserve the pooled reserve")
+	TEST_ASSERT_EQUAL(golden_gun.projectiles + golden_gun.projectiles_cache + gardren_gun.projectiles + gardren_gun.projectiles_cache, 0, "The docked halves kept a duplicate stock")
+	TEST_ASSERT(!combined_gun.detachable, "A gun manufactured during assembly can be removed for free")
+
+	combined_gun.firing_burst = TRUE
+	TEST_ASSERT_NOTNULL(combined.separate_blocker(), "Separation was allowed during a burst")
+	combined_gun.firing_burst = FALSE
+	TEST_ASSERT(combined_gun.action(gunner, get_step(combined, EAST), list()), "The combined gun could not fire")
+	TEST_ASSERT(combined_gun.rearm(), "The combined gun could not reload its partially expended stock")
+	TEST_ASSERT(combined.disassemble(), "Separation failed after firing")
+	TEST_ASSERT_EQUAL(golden_gun.projectiles, 250, "Golden did not receive its share of the remaining ammo")
+	TEST_ASSERT_EQUAL(gardren_gun.projectiles, 249, "Gardren did not receive its share of the remaining ammo")
+	TEST_ASSERT_EQUAL(golden_gun.projectiles_cache + gardren_gun.projectiles_cache, 0, "Separation manufactured extra reserve ammo")
+
+	combined = allocate(/obj/vehicle/sealed/mecha/golden_gardren, null, TRUE)
+	TEST_ASSERT(combined.assemble(golden, gardren, gunner, driver), "Reassembly failed")
+	combined_gun = combined.get_machine_gun()
+	TEST_ASSERT_EQUAL(combined_gun.projectiles + combined_gun.projectiles_cache, 499, "Repeated assembly replenished spent ammunition")
+	combined_gun.projectiles = 2
+	TEST_ASSERT(combined_gun.action(gunner, get_step(combined, EAST), list()), "The gun could not fire a partial burst")
+	TEST_ASSERT_EQUAL(combined_gun.projectiles, 0, "A partial burst fired more rounds than were loaded")
+
+/datum/unit_test/golden_gardren_ammo_capacity
+
+/datum/unit_test/golden_gardren_ammo_capacity/Run()
+	var/obj/vehicle/sealed/mecha/golden/golden = allocate(/obj/vehicle/sealed/mecha/golden)
+	var/obj/vehicle/sealed/mecha/gardren/gardren = allocate(/obj/vehicle/sealed/mecha/gardren)
+	var/mob/living/carbon/human/consistent/gunner = allocate(/mob/living/carbon/human/consistent)
+	var/mob/living/carbon/human/consistent/driver = allocate(/mob/living/carbon/human/consistent)
+	golden.mob_enter(gunner, silent = TRUE)
+	gardren.mob_enter(driver, silent = TRUE)
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/golden_gun = golden.get_machine_gun()
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/gardren_gun = gardren.get_machine_gun()
+	golden_gun.projectiles_cache = golden_gun.projectiles_cache_max
+	gardren_gun.projectiles_cache = gardren_gun.projectiles_cache_max
+	var/obj/vehicle/sealed/mecha/golden_gardren/combined = allocate(/obj/vehicle/sealed/mecha/golden_gardren, null, TRUE)
+	TEST_ASSERT(combined.assemble(golden, gardren, gunner, driver), "Assembly failed with two full reserves")
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/combined_gun = combined.get_machine_gun()
+	TEST_ASSERT_EQUAL(combined_gun.projectiles_cache, combined_gun.projectiles_cache_max, "The pooled reserve overfilled the combined gun")
+	TEST_ASSERT_EQUAL(golden_gun.projectiles_cache + gardren_gun.projectiles_cache, 900, "Assembly lost ammo beyond the combined capacity")
+	TEST_ASSERT(combined.disassemble(), "Separation failed with two full reserves")
+	TEST_ASSERT_EQUAL(golden_gun.projectiles + golden_gun.projectiles_cache, 1500, "Golden lost part of its ammo on separation")
+	TEST_ASSERT_EQUAL(gardren_gun.projectiles + gardren_gun.projectiles_cache, 1500, "Gardren lost part of its ammo on separation")
+
+	qdel(gardren_gun)
+	combined = allocate(/obj/vehicle/sealed/mecha/golden_gardren, null, TRUE)
+	TEST_ASSERT(combined.assemble(golden, gardren, gunner, driver), "Assembly failed with one compatible gun")
+	combined_gun = combined.get_machine_gun()
+	combined_gun.projectiles_cache = combined_gun.projectiles_cache_max
+	var/turf/frame_turf = get_turf(combined)
+	TEST_ASSERT(combined.disassemble(), "Separation failed with one compatible gun")
+	var/obj/item/mecha_ammo/lmg/ammo_box = locate() in frame_turf
+	allocated += ammo_box
+	TEST_ASSERT_NOTNULL(ammo_box, "Extra ammo was lost after separation")
+	TEST_ASSERT_EQUAL(ammo_box.rounds, 600, "The extra ammo box has the wrong number of rounds")
 
 /datum/unit_test/golden_gardren_combine_requires_crew
 
@@ -592,14 +686,15 @@
 /datum/unit_test/golden_gardren_fist_objects
 
 /datum/unit_test/golden_gardren_fist_objects/Run()
-	var/obj/vehicle/sealed/mecha/gardren/gardren = allocate(/obj/vehicle/sealed/mecha/gardren)
+	var/obj/vehicle/sealed/mecha/golden_gardren/mech = allocate(/obj/vehicle/sealed/mecha/golden_gardren)
 	var/mob/living/carbon/human/consistent/pilot = allocate(/mob/living/carbon/human/consistent)
-	var/turf/front_turf = get_step(gardren.loc, EAST)
-	gardren.mob_enter(pilot, silent = TRUE)
-	gardren.setDir(EAST)
+	pilot.add_or_update_variable_actionspeed_modifier(/datum/actionspeed_modifier/base, multiplicative_slowdown = 1)
+	var/turf/front_turf = get_step(mech.loc, EAST)
+	mech.mob_enter(pilot, silent = TRUE)
+	mech.setDir(EAST)
 	pilot.set_combat_mode(TRUE)
-	var/datum/component/golden_gardren_fist/fist = gardren.GetComponent(/datum/component/golden_gardren_fist)
-	var/datum/action/fist_button = LAZYACCESSASSOC(gardren.occupant_actions, pilot, /datum/action/vehicle/sealed/mecha/golden_gardren_fist)
+	var/datum/component/golden_gardren_fist/fist = mech.GetComponent(/datum/component/golden_gardren_fist)
+	var/datum/action/fist_button = LAZYACCESSASSOC(mech.occupant_actions, pilot, /datum/action/vehicle/sealed/mecha/golden_gardren_fist)
 	fist_button.Trigger()
 
 	var/obj/item/wrench/wrench = allocate(/obj/item/wrench, front_turf)
@@ -613,18 +708,18 @@
 	var/obj/structure/table/table = allocate(/obj/structure/table, front_turf)
 	var/table_pixel_w = table.pixel_w
 	click_wrapper(pilot, table)
-	TEST_ASSERT_EQUAL(fist.held, table, "The fist did not take a table")
+	TEST_ASSERT_EQUAL(fist.held, table, "The fist did not take the table immediately on click")
 	TEST_ASSERT(!table.anchored, "The table stayed bolted down in the fist")
-	TEST_ASSERT_EQUAL(table.loc, gardren.loc, "The held table was not lifted onto the mech")
+	TEST_ASSERT_EQUAL(table.loc, mech.loc, "The held table was not lifted onto the mech")
 	TEST_ASSERT(table.pixel_w > table_pixel_w, "The held table is not drawn in front of a mech facing east")
 
-	var/turf/next = get_step(gardren.loc, NORTH)
-	TEST_ASSERT(gardren.Move(next, NORTH), "The mech could not step with a table in the fist")
-	TEST_ASSERT_EQUAL(table.loc, gardren.loc, "The held table did not ride along with the mech")
+	var/turf/next = get_step(mech.loc, NORTH)
+	TEST_ASSERT(mech.Move(next, NORTH), "The mech could not step with a table in the fist")
+	TEST_ASSERT_EQUAL(table.loc, mech.loc, "The held table did not ride along with the mech")
 	TEST_ASSERT_EQUAL(table.pixel_w, table_pixel_w, "The held table was not moved in front of the mech when it turned")
 
-	var/turf/aim = locate(gardren.x, min(gardren.y + 3, run_loc_floor_top_right.y), gardren.z)
+	var/turf/aim = locate(mech.x, min(mech.y + 3, run_loc_floor_top_right.y), mech.z)
 	click_wrapper(pilot, aim)
 	TEST_ASSERT_NULL(fist.held, "A click with a table in the fist did not throw it")
-	TEST_ASSERT(table.throwing || table.loc != gardren.loc, "The table was not thrown")
+	TEST_ASSERT(table.throwing || table.loc != mech.loc, "The table was not thrown")
 	TEST_ASSERT_EQUAL(table.pixel_w, table_pixel_w, "The thrown table kept the fist's offset")

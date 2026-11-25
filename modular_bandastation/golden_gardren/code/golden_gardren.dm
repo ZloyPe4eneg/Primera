@@ -13,6 +13,7 @@
 	armor_type = /datum/armor/mecha_golden_gardren
 	force = 45
 	max_occupants = 2
+	equipment_action_control_flag = VEHICLE_CONTROL_EQUIPMENT
 	factory_cell_type = /obj/item/stock_parts/power_store/cell/infinite/abductor
 	removable_cell = FALSE
 	heavy_emergency_smoke = TRUE
@@ -20,9 +21,9 @@
 	equip_by_category = list(
 		MECHA_L_ARM = /obj/item/mecha_parts/mecha_equipment/weapon/energy/laser/heavy/golden_gardren,
 		MECHA_R_ARM = /obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/golden_gardren,
-		MECHA_UTILITY = list(),
+		MECHA_UTILITY = list(/obj/item/mecha_parts/mecha_equipment/thrusters/ion, /obj/item/mecha_parts/mecha_equipment/repair_droid),
 		MECHA_POWER = list(),
-		MECHA_ARMOR = list(),
+		MECHA_ARMOR = list(/obj/item/mecha_parts/mecha_equipment/armor/antiproj_armor_booster),
 	)
 	var/obj/vehicle/sealed/mecha/golden/docked_golden
 	var/obj/vehicle/sealed/mecha/gardren/docked_gardren
@@ -87,19 +88,6 @@
 			return occupant
 	return null
 
-/obj/vehicle/sealed/mecha/golden_gardren/generate_equipment_actions(mob/occupant)
-	if(!(LAZYACCESS(occupants, occupant) & VEHICLE_CONTROL_EQUIPMENT))
-		return
-	for(var/obj/item/mecha_parts/mecha_equipment/equipment in flat_equipment)
-		if(is_equipment_valid_for_action(equipment))
-			grant_equipment_action(occupant, equipment)
-
-/obj/vehicle/sealed/mecha/golden_gardren/on_equipment_attach(obj/item/mecha_parts/mecha_equipment/equipment)
-	if(!is_equipment_valid_for_action(equipment))
-		return
-	for(var/mob/occupant as anything in return_controllers_with_flag(VEHICLE_CONTROL_EQUIPMENT))
-		grant_equipment_action(occupant, equipment)
-
 /obj/vehicle/sealed/mecha/golden_gardren/ui_act(action, list/params, datum/tgui/ui, datum/ui_state/state)
 	var/mob/user = ui?.user
 	if(user && is_occupant(user))
@@ -134,6 +122,14 @@
 	if(!cell)
 		cell = new factory_cell_type(src)
 	gardren.transfer_support_parts(src)
+	for(var/obj/item/mecha_parts/mecha_equipment/equipment as anything in flat_equipment)
+		equipment.detachable = FALSE
+	var/obj/item/mecha_parts/mecha_equipment/weapon/ballistic/lmg/gun = get_machine_gun()
+	if(gun)
+		gun.projectiles = 0
+		gun.projectiles_cache = 0
+		golden_gardren_transfer_ammo(golden.get_machine_gun(), gun)
+		golden_gardren_transfer_ammo(gardren.get_machine_gun(), gun)
 
 	max_integrity = golden.max_integrity + gardren.max_integrity
 	update_integrity(golden.get_integrity() + gardren.get_integrity())
